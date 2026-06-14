@@ -1,0 +1,8 @@
+/vendor/
+.env
+.phpunit.result.cache
+.phpunit.cache/
+docker/data/
+docker/zookeeper_data/
+docker/kafka_data/
+docker/redis_data/
