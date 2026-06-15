@@ -10,6 +10,16 @@
         </div>
     </div>
 
+    <!-- Pestañas Multi-Token -->
+    <div class="flex space-x-4 mb-6 border-b border-gray-700">
+        @foreach($prices as $symbol => $price)
+            <button wire:click="$set('activeTab', '{{ $symbol }}')" 
+                    class="px-4 py-3 font-semibold transition-colors duration-200 {{ $activeTab === $symbol ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-gray-200' }}">
+                {{ $symbol }}
+            </button>
+        @endforeach
+    </div>
+
     <!-- Resumen General -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
         <!-- Valor Total -->
@@ -33,21 +43,24 @@
         <!-- Composición de la Billetera -->
         <div class="bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-lg">
             <p class="text-gray-400 text-sm font-semibold mb-3">ACTIVOS EN BILLETERA</p>
-            <div class="flex justify-between items-center mb-1">
+            <div class="flex justify-between items-center mb-2 border-b border-gray-700 pb-2">
                 <span class="text-sm text-gray-400">USDT Disponible</span>
                 <span class="text-sm font-bold text-green-400">${{ number_format($usdtBalance, 2) }}</span>
             </div>
-            <div class="flex justify-between items-center">
-                <span class="text-sm text-gray-400">Bitcoin Comprado</span>
-                <span class="text-sm font-bold text-orange-400">₿ {{ number_format($btcBalance, 6) }}</span>
-            </div>
+            @foreach($balances as $sym => $bal)
+                @php $base = explode('/', $sym)[0]; @endphp
+                <div class="flex justify-between items-center mt-1">
+                    <span class="text-sm text-gray-400">{{ $base }} Comprado</span>
+                    <span class="text-sm font-bold text-orange-400">{{ number_format($bal, 6) }}</span>
+                </div>
+            @endforeach
         </div>
         
         <!-- Precio de Mercado -->
         <div class="bg-gray-800 p-6 rounded-xl border border-blue-900 shadow-lg relative overflow-hidden">
             <div class="absolute inset-0 bg-blue-500 opacity-10"></div>
-            <p class="text-blue-300 text-sm font-semibold mb-1">PRECIO MERCADO BTC/USDT</p>
-            <p class="text-3xl font-bold text-white">${{ number_format($currentPrice, 2) }}</p>
+            <p class="text-blue-300 text-sm font-semibold mb-1">PRECIO MERCADO {{ $activeTab }}</p>
+            <p class="text-3xl font-bold text-white">${{ number_format($prices[$activeTab] ?? 0, 2) }}</p>
         </div>
     </div>
 

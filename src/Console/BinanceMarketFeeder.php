@@ -22,8 +22,7 @@ $factory = new KafkaProducerFactory();
 $producer = $factory->create('kafka:29092');
 $streamer = new MarketDataStreamer($producer);
 
-$symbol = 'BTC/USDT';
-$wsUrl = 'wss://stream.binance.com:9443/ws/btcusdt@ticker';
+$wsUrl = 'wss://stream.binance.com:9443/stream?streams=btcusdt@ticker/ethusdt@ticker/solusdt@ticker';
 
 $keepRunning = true;
 if (function_exists('pcntl_async_signals')) {
@@ -47,16 +46,21 @@ while ($keepRunning) {
             $message = $client->receive();
             $data = json_decode($message, true);
 
-            // En el payload de @ticker, 'c' es el 'Last Price' (el precio actual real).
-            // (La propiedad 'p' en @ticker es el Price Change de 24h).
-            if (isset($data['c'])) {
-                $price = (float)$data['c'];
+            // Payload combinado usa formato {"stream": "...", "data": {"s": "BTCUSDT", "c": "65000"}}
+            if (isset($data['data']['c']) && isset($data['data']['s'])) {
+                $rawSymbol = $data['data']['s'];
+                $price = (float)$data['data']['c'];
                 
-                $tick = new PriceTick($symbol, $price, time());
-                $streamer->streamTick($tick, 'market.ticker.btc_usdt');
-                $producer->poll(0);
-
-                echo "[Live WS Tick] $symbol -> $" . number_format($price, 2) . "     \r";
+                // Mapeo a nuestra nomenclatura interna
+                $map = ['BTCUSDT' => 'BTC/USDT', 'ETHUSDT' => 'ETH/USDT', 'SOLUSDT' => 'SOL/USDT'];
+                $symbol = $map[$rawSymbol] ?? null;
+                
+                if ($symbol) {
+                    $tick = new PriceTick($symbol, $price, time());
+                    $topic = 'market.ticker.' . strtolower(str_replace('/', '_', $symbol));
+                    $streamer->streamTick($tick, $topic);
+                    $producer->poll(0);
+                }
             }
         }
     } catch (ConnectionException $e) {

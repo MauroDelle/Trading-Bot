@@ -9,49 +9,56 @@ use Predis\Client;
 
 class TradingDashboard extends Component
 {
-    public float $currentPrice = 0.0;
     public array $gridLevels = [];
     public float $usdtBalance = 0.0;
-    public float $btcBalance = 0.0;
     public array $latestTrades = [];
     
-    public float $initialInvestment = 400.0;
+    public float $initialInvestment = 0.0;
     public float $totalEquity = 0.0;
     public float $profitUsdt = 0.0;
+    
+    public array $balances = [];
+    public array $prices = [];
+    public string $activeTab = 'BTC/USDT';
 
     public function render()
     {
         $redis = new Client(['host' => 'redis', 'port' => 6379]);
+        $configs = require __DIR__ . '/../../../config/strategies.php';
         
-        $this->usdtBalance = (float) ($redis->get('balance:USDT') ?? 400.0);
-        $this->btcBalance = (float) ($redis->get('balance:BTC') ?? 0.0);
-        $this->currentPrice = (float) ($redis->get('price:BTC/USDT') ?? 0.0);
+        $this->usdtBalance = (float) ($redis->get('balance:USDT') ?? 0.0);
+        $this->initialInvestment = 0.0;
+        $this->totalEquity = $this->usdtBalance;
+        
+        $this->balances = [];
+        $this->prices = [];
 
-        // Cálculos amigables de rendimiento
-        $this->totalEquity = $this->usdtBalance + ($this->btcBalance * $this->currentPrice);
+        foreach ($configs as $symbol => $c) {
+            $this->initialInvestment += $c['totalInvestment'];
+            
+            list($base, $quote) = explode('/', $symbol);
+            $balance = (float) ($redis->get("balance:{$base}") ?? 0.0);
+            $price = (float) ($redis->get("price:{$symbol}") ?? 0.0);
+            
+            $this->balances[$symbol] = $balance;
+            $this->prices[$symbol] = $price;
+            
+            $this->totalEquity += ($balance * $price);
+        }
+        
         $this->profitUsdt = $this->totalEquity - $this->initialInvestment;
 
-        // Reconstruimos visualmente los niveles reales (60k a 70k)
-        $upperPrice = 70000.0;
-        $lowerPrice = 60000.0;
-        $totalGrids = 10;
-        $step = ($upperPrice - $lowerPrice) / $totalGrids;
-        
-        $levels = [];
-        for ($i = 0; $i <= $totalGrids; $i++) {
-            $levels[] = $lowerPrice + ($step * $i);
-        }
         $this->gridLevels = [];
+        $activeConfig = $configs[$this->activeTab] ?? null;
         
-        foreach ($levels as $index => $price) {
-            $this->gridLevels[] = [
-                'index' => $index,
-                'price' => $price,
-                'state' => $redis->get("grid:state:BTC/USDT:{$index}") ?? 'PENDING'
-            ];
+        if ($activeConfig) {
+            $step = ($activeConfig['upperPrice'] - $activeConfig['lowerPrice']) / $activeConfig['totalGrids'];
+            for ($i = 0; $i <= $activeConfig['totalGrids']; $i++) {
+                $p = $activeConfig['lowerPrice'] + ($step * $i);
+                $this->gridLevels[] = ['index' => $i, 'price' => $p, 'state' => $redis->get("grid:state:{$this->activeTab}:{$i}") ?? 'PENDING'];
+            }
+            usort($this->gridLevels, fn($a, $b) => $b['price'] <=> $a['price']);
         }
-
-        usort($this->gridLevels, fn($a, $b) => $b['price'] <=> $a['price']);
 
         try {
             $pdo = new \PDO('pgsql:host=postgres;port=5432;dbname=tradingbot', 'botuser', 'botpassword', [

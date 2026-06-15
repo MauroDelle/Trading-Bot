@@ -9,30 +9,40 @@ use App\Data\PriceTick;
 use App\Factory\KafkaProducerFactory;
 
 echo "=============================================\n";
-echo "📈 Iniciando Fake Market Feeder (Simulador)\n";
+echo "📈 Iniciando Fake Market Feeder (Multi-Token)\n";
 echo "=============================================\n\n";
 
 $factory = new KafkaProducerFactory();
-// Se conecta al broker interno de Kafka en el entorno Docker
 $producer = $factory->create('kafka:29092');
 $streamer = new MarketDataStreamer($producer);
 
-$price = 65500.0; // Precio inicial cerca del mercado actual
+$configs = require __DIR__ . '/../../config/strategies.php';
+$prices = [];
+
+// Inicializar precios base en el medio del grid de cada token
+foreach ($configs as $symbol => $c) {
+    $prices[$symbol] = ($c['upperPrice'] + $c['lowerPrice']) / 2;
+}
 
 while (true) {
-    // Caminata aleatoria de -500 a +500 USDT para simular volatilidad extrema
-    $change = mt_rand(-50000, 50000) / 100.0;
-    $price += $change;
+    foreach ($configs as $symbol => $c) {
+        // Volatilidad del 0.5% del valor de la moneda
+        $volatility = $prices[$symbol] * 0.005; 
+        $change = (mt_rand(-100, 100) / 100.0) * $volatility;
+        
+        $prices[$symbol] += $change;
 
-    // Mantenemos el precio oscilando dentro del grid de 60k a 70k
-    if ($price > 71000.0) $price = 71000.0;
-    if ($price < 59000.0) $price = 59000.0;
+        // Limites para que no se salga infinitamente del grid
+        if ($prices[$symbol] > $c['upperPrice'] * 1.1) $prices[$symbol] = $c['upperPrice'] * 1.1;
+        if ($prices[$symbol] < $c['lowerPrice'] * 0.9) $prices[$symbol] = $c['lowerPrice'] * 0.9;
 
-    $tick = new PriceTick('BTC/USDT', $price, time());
-    $streamer->streamTick($tick, 'market.ticker.btc_usdt');
+        $tick = new PriceTick($symbol, $prices[$symbol], time());
+        $topic = 'market.ticker.' . strtolower(str_replace('/', '_', $symbol));
+        $streamer->streamTick($tick, $topic);
 
-    echo "[Market Tick] BTC/USDT -> " . number_format($price, 2) . " USDT\n";
-    
-    // Simula 1 tick por segundo
+        echo "[Fake Tick] $symbol -> $" . number_format($prices[$symbol], 2) . "   \n";
+    }
+    $producer->poll(0);
+    echo "----------------------------------------\n";
     sleep(1);
 }

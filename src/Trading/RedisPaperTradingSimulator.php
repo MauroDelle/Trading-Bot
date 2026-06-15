@@ -19,16 +19,18 @@ class RedisPaperTradingSimulator implements OrderRouterInterface
         $grossValue = $amount * $price;
         $fee = $grossValue * $feeRate;
 
+        list($base, $quote) = explode('/', $symbol);
+
         if ($side === 'BUY') {
             $totalCost = $grossValue + $fee;
-            $this->redis->incrbyfloat('balance:USDT', -$totalCost);
-            $this->redis->incrbyfloat('balance:BTC', $amount);
-            echo "\n[⚡ ORDEN] COMPRA de " . number_format($amount, 4) . " BTC a $" . number_format($price, 2) . " USDT (Comisión: $" . number_format($fee, 4) . ")\n";
+            $this->redis->incrbyfloat("balance:{$quote}", -$totalCost);
+            $this->redis->incrbyfloat("balance:{$base}", $amount);
+            echo "\n[⚡ ORDEN] COMPRA de " . number_format($amount, 4) . " {$base} a $" . number_format($price, 2) . " {$quote} (Comisión: $" . number_format($fee, 4) . ")\n";
         } elseif ($side === 'SELL') {
             $netProceeds = $grossValue - $fee;
-            $this->redis->incrbyfloat('balance:USDT', $netProceeds);
-            $this->redis->incrbyfloat('balance:BTC', -$amount);
-            echo "\n[⚡ ORDEN] VENTA de " . number_format($amount, 4) . " BTC a $" . number_format($price, 2) . " USDT (Comisión: $" . number_format($fee, 4) . ")\n";
+            $this->redis->incrbyfloat("balance:{$quote}", $netProceeds);
+            $this->redis->incrbyfloat("balance:{$base}", -$amount);
+            echo "\n[⚡ ORDEN] VENTA de " . number_format($amount, 4) . " {$base} a $" . number_format($price, 2) . " {$quote} (Comisión: $" . number_format($fee, 4) . ")\n";
         }
     }
 
