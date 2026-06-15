@@ -10,7 +10,12 @@ RUN apk add --no-cache \
     linux-headers \
     git \
     unzip \
-    bash
+    bash \
+    gmp-dev \
+    postgresql-dev
+
+# Install bcmath, gmp, pcntl, and pdo_pgsql core extensions
+RUN docker-php-ext-install bcmath gmp pdo_pgsql pcntl
 
 # Install Redis & rdkafka extensions via PECL
 RUN pecl install redis rdkafka \
