@@ -29,6 +29,32 @@ Actualmente, el sistema opera exclusivamente en modo **100% Paper Trading** (sim
 
 El proyecto sigue principios de Diseño Guiado por el Dominio (DDD) y patrones SOLID, garantizando modularidad y facilidad de prueba.
 
+### 📊 Diagrama de Arquitectura
+
+```mermaid
+flowchart LR
+    subgraph Data Ingestion
+        A1[🌐 Real Market / Binance] -->|WebSockets| B{Apache Kafka}
+        A2[🧪 Fake Market Feeder] -->|Simulated Ticks| B
+    end
+
+    subgraph Core Trading Engine
+        B -->|Market Events| C[⚙️ BotRunner Worker]
+        C <-->|Read/Write Grid State| D[(⚡ Redis)]
+        C -->|Evaluate Strategy| C
+    end
+
+    subgraph Persistence & Outputs
+        C -->|Log Trades Ledger| E[(🐘 PostgreSQL)]
+        C -->|Push Alerts| F[📱 Telegram Notifier]
+    end
+
+    subgraph Visual Interface
+        D -.->|Read Balances & State| G[📊 Laravel Dashboard]
+        G --> H((👤 User))
+    end
+```
+
 - **Lenguaje Core:** PHP 8.2+ con tipado estricto (`declare(strict_types=1);`).
 - **Entorno de Ejecución:** FrankenPHP en *Worker Mode*, eliminando el *overhead* de inicialización de PHP y permitiendo la ejecución persistente en memoria.
 - **Message Broker:** Apache Kafka y Zookeeper para un flujo de eventos de mercado asíncrono y desacoplado.
